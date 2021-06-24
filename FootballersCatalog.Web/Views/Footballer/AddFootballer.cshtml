@@ -1,0 +1,171 @@
+﻿@model FootballersCatalog.Web.ViewModel.CountryTeam.CountryTeamViewModel
+
+<div class="container">
+    <div class="row">
+        <h3>Заполните форму, чтобы добавить футболиста:</h3>
+    </div>
+    <form id="footballerForm">
+        <div class="row form-container">
+            <div class="form-container">
+                <label style="font-weight:bold;">Фамилия</label>
+                <input class="form-control" type="text" name="lastName" value="" />
+            </div>
+            <div class="form-container mt-3">
+                <label style="font-weight:bold;">Имя</label>
+                <input class="form-control" type="text" name="firstName" value="" />
+            </div>
+            <div class="form-container mt-3">
+                <label style="font-weight:bold;">Отчество</label>
+                <input class="form-control" type="text" name="middleName" value="" />
+            </div>
+            <div class="form-container mt-3">
+                <label style="font-weight:bold;">Пол</label>
+                <div>
+                    <div>
+                        <input class="form-check" name="gender" type="radio" value="Male" />
+                        <span>Мужчина</span>
+                    </div>
+                    <div>
+                        <input class="form-check" name="gender" type="radio" checked value="Female" />
+                        <span>Женщина</span>
+                    </div>
+                </div>
+            </div>
+            <div class="form-container mt-3">
+                <label style="font-weight:bold;">Дата рождения</label>
+                <input class="form-control" type="text" name="birthDate" value="" />
+            </div>
+            <div class="form-container mt-3">
+                <label style="font-weight:bold;">Команда</label>
+                <select id="teamSelect" class="form-control" name="team">
+                    @foreach (var team in Model.TeamViewModels)
+                    {
+                        <option value="@team.Id">@team.Name</option>
+                    }
+                </select>
+                <button type="button" id="TeamModalBtn" class="btn btn-primary mt-3" data-toggle="modal" data-target="#teamModal">Добавить новую команду</button>
+            </div>
+            <div class="form-container mt-3">
+                <label style="font-weight:bold;" for="phone">Выберите страну:</label>
+                <select id="countrySelect" class="form-control" name="country">
+                    @foreach (var country in Model.CountryViewModels)
+                    {
+                        <option value="@country.Id">@country.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="row mt-4" style="margin-left:10px; margin-right:10px;">
+                <button class="btn btn-primary" type="button" id="addBtn">Добавить</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+@await Html.PartialAsync("_TeamModalWindowPartial")
+
+@section Scripts {
+
+    <script src="~/js/Pages/Footballer/dataPickerScripts.js"></script>
+    <script src="~/js/Pages/Footballer/formValidation.js"></script>
+    <script src="~/js/Pages/Footballer/generalFunctions.js"></script>
+    <script>
+
+
+        ///  VARS
+
+        const formValidator = new FormValidation();
+        const datePicker = new DatePicker();
+        const generalFunctions = new GenralFunctions();
+
+        /// INIT
+
+        $(window).on("load", function () {
+            formValidator.createFormValidation('#footballerForm');
+            datePicker.initDatePicker();
+        });
+
+        /// EVENTS
+
+        $('#addBtn').on('click', function () {
+            if (formValidator.validateForm('#footballerForm')) {
+                let footballerModel = generalFunctions.getFootballerModel();
+                addFottballer(footballerModel);
+            }
+            else {
+                scrollToWrongElement('.error');
+            }
+        });
+
+        $('#addNewTeamBtn').on('click', function () {
+            let element = $('[name="new-team-field"]');
+            let teamsNames = [];
+            $('#teamSelect').find('option').each(function () {
+                teamsNames.push($(this).text());
+            });
+
+            if (formValidator.validateTeamName(element, teamsNames)) {
+                addNewTeam();
+                $('#teamModal').modal('hide');
+            }
+        });
+
+        $('#TeamModalBtn').on('click', function () {
+            removeErrors($('[name="new-team-field"]'));
+        });
+
+        /// FUNCTIONS
+
+        function addFottballer(footballerModel) {
+            $.ajax({
+                type: "POST",
+                url: '@(Url.Action("Add", "Footballer"))',
+                data: { footballerViewModel: footballerModel },
+                dataType: "json",
+                success: function (responseFootballerNameModel) {
+                    if (responseFootballerNameModel.responseModel.success) {
+                        alert(responseFootballerNameModel.responseModel.message);
+                        refreshForm();
+                        hubConnection.invoke("AddFootballer", responseFootballerNameModel.footballerNameViewModel);
+                    }
+                    else {
+                        alert(responseFootballerNameModel.responseModel.message);
+                    }
+                }
+            });
+        }
+
+        function addNewTeam() {
+            let teamNameField= $('[name="new-team-field"]');
+            $.ajax({
+                type: "POST",
+                url: '@(Url.Action("Add", "Team"))',
+                data: { name: teamNameField.val() },
+                dataType: "json",
+                success: function (teamResponseViewModel) {
+                    if (teamResponseViewModel.responseModel.success) {
+                        teamNameField.val("");
+                        addNewTeamToList(teamResponseViewModel.teamViewModel);
+                    }
+                    else {
+                        alert(responseFootballerNameModel.responseModel.message);
+                    }
+                }
+            });
+        }
+
+        function addNewTeamToList(teamModel) {
+            let teamSelect = $('#teamSelect');
+            teamSelect.append(`<option value="${teamModel.id}">${teamModel.name}</option>`);
+            let lastOption = teamSelect.children().last().prop('selected', true);
+            lastOption.prop('selected', true);
+            teamSelect.val(lastOption.val());
+        }
+
+        function refreshForm() {
+            $('[name="lastName"]').val("");
+            $('[name="firstName"]').val("");
+            $('[name="middleName"]').val("");
+        }
+
+    </script>
+}

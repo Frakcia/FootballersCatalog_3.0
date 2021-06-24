@@ -1,0 +1,217 @@
+﻿@model FootballersCatalog.Web.ViewModel.FootballerNameExtendedModel
+
+<div class="container">
+    <div class="row">
+        <h2>Список футболистов</h2>
+    </div>
+    <div class="row flex-container mt-4">
+        <div>
+            <span style="display:block; margin-bottom:15px; font-size: 16px; font-weight: bold;">Футболисты:</span>
+            <nav class="nav footballers-nav">
+                <ul style="height:600px; overflow-y: auto;" class="ul" id="footballerList">
+                    @foreach (var footballer in Model.FootballerNameViewModels)
+                    {
+                        <li class="li footballer-li" data-footballer-id="@footballer.Id">
+                            <span class="footballer-name">@footballer.Name</span>
+                            <span class="edit-btn footballerBtn" data-toggle="tooltip" title="Редактировать футболиста"></span>
+                        </li>
+                    }
+                    @if(Model.FootballerNameViewModels.Count() == 0)
+                    {
+                        <li class="li empty-list">Список пуст...</li>
+                    }
+                </ul>
+            </nav>
+        </div>
+        <form id="footballerForm" class="form-none">
+            <div class="form-containerr footballer-form" id="editContainer">
+                <input type="hidden" name="id" value="" />
+                <div>
+                    <label style="font-weight:bold;">Фамилия</label>
+                    <input class="form-control" type="text" name="lastName" value="" />
+                </div>
+                <div class="mt-3">
+                    <label style="font-weight:bold;">Имя</label>
+                    <input class="form-control" type="text" name="firstName" value="" />
+                </div>
+                <div class="mt-3">
+                    <label style="font-weight:bold;">Отчество</label>
+                    <input class="form-control" type="text" name="middleName" value="" />
+                </div>
+                <div class="mt-3">
+                    <label style="font-weight:bold;">Дата рождения</label>
+                    <input class="form-control" type="text" name="birthDate" value="" />
+                </div>
+                <div class="mt-3">
+                    <div class="mt-3">
+                        <label style="font-weight:bold;">Пол</label>
+                        <div>
+                            <div>
+                                <input class="form-check" name="gender" type="radio" checked value="Male" />
+                                <span>Мужчина</span>
+                            </div>
+                            <div>
+                                <input class="form-check" name="gender" type="radio" value="Female" />
+                                <span>Женщина</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label style="font-weight:bold;">Страна</label>
+                    <select name="country" id="countrySelect" class="form-control">
+                        @foreach (var country in Model.CountryViewModels)
+                        {
+                            <option value="@country.Id">@country.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="mt-3">
+                    <label style="font-weight:bold;">Команда</label>
+                    <select name="team" id="teamSelect" class="form-control">
+                        @foreach (var team in Model.TeamViewModels)
+                        {
+                            <option value="@team.Id">@team.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="row mt-4" style="margin-left: 15px; margin-right:15px;">
+                    <button type="button" id="editBtn" class="btn btn-primary">Редактировать</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+@section Scripts {
+
+    <script src="~/js/Pages/Footballer/dataPickerScripts.js"></script>
+    <script src="~/js/Pages/Footballer/formValidation.js"></script>
+    <script src="~/js/Pages/Footballer/generalFunctions.js"></script>
+    <script>
+
+        /// VARS
+
+        const formValidator = new FormValidation();
+        const datePicker = new DatePicker();
+        const generalFunctions = new GenralFunctions();
+
+        /// INIT
+
+        $(window).on("load", function () {
+            formValidator.createFormValidation('#footballerForm');
+            datePicker.initDatePicker();
+            ActivateTooltip();
+        });
+
+        /// EVENTS       
+
+        $('#footballerList').on('click', '.footballerBtn', function () {
+            let currentFootballerId = $('[name="id"]').val();
+            let footballerId = $(this).closest('li').attr('data-footballer-id');
+            let form = $('#footballerForm');          
+
+            if (footballerId !== currentFootballerId) {
+                if (form.hasClass('form-none')) {
+                    form.removeClass('form-none');
+                }
+                getFootballerData(footballerId);
+            }
+            else {
+                makeFormVisible(form);
+            }
+        });
+
+        $('#editBtn').on('click', function () {
+            let footballerId = $('[name="id"]').val();
+            if (footballerId === '') {
+                alert('Выберите пользователя из списка, для редактирования');
+                return;
+            }
+            if (formValidator.validateForm('#footballerForm')) {
+                let footballerModel = generalFunctions.getFootballerModel();
+                editFootballer(footballerModel);
+            }
+        });
+
+        hubConnection.on('EditFootballer', function (footballerNameViewModel) {
+            $('#footballerList')
+                .find(`[data-footballer-id="${footballerNameViewModel.id}"]`)
+                .find('.footballer-name').text(footballerNameViewModel.name);
+        });
+
+        /// FUNCTIONS
+
+        function ActivateTooltip() {
+            $('[data-toggle="tooltip"]').tooltip();
+        }
+
+        function makeFormVisible(form) {
+            if (form.hasClass('form-none')) {
+                form.removeClass('form-none');
+            }
+            else {
+                form.addClass('form-none');
+            }
+        }
+
+        function getFootballerData(footballerId) {
+            $.ajax({
+                type: "POST",
+                url: '@(Url.Action("GetData", "Footballer"))',
+                data: { footballerId: footballerId },
+                dataType: "json",
+                success: function (responseFootballerModel) {
+                    if (responseFootballerModel.responseModel.success) {
+                        fillFormContainer(responseFootballerModel.footballerViewModel);
+                    }
+                    else {
+                        alert(responseFootballerModel.responseModel.message);
+                    }
+                }
+            });
+        }
+
+        function editFootballer(footballerModel) {
+            $.ajax({
+                type: "POST",
+                url: '@(Url.Action("Edit", "Footballer"))',
+                data: { footballerViewModel: footballerModel },
+                dataType: "json",
+                success: function (responseFootballerNameModel) {
+                    if (responseFootballerNameModel.responseModel.success) {
+                        hubConnection.invoke("EditFootballer", responseFootballerNameModel.footballerNameViewModel);
+                    }
+                    alert(responseFootballerNameModel.responseModel.message);
+                }
+            });
+        }       
+
+        function fillFormContainer(footballerViewModel) {
+            let eidtContainer = $('#editContainer');
+            eidtContainer.find('[name="id"]').val(footballerViewModel.id);
+            eidtContainer.find('[name="lastName"]').val(footballerViewModel.lastName);
+            eidtContainer.find('[name="firstName"]').val(footballerViewModel.firstName);
+            eidtContainer.find('[name="middleName"]').val(footballerViewModel.middleName);
+            eidtContainer.find('[name="birthDate"]').val(footballerViewModel.birthDate);
+            eidtContainer.find('[name="team"]')
+                .find(`[value="${footballerViewModel.selectedTeam.id}"]`)
+                .prop('selected', true);
+
+            eidtContainer.find('[name="country"]')
+                .find(`[value="${footballerViewModel.selectedCountry.id}"]`)
+                .prop('selected', true);
+
+            eidtContainer.find('[name="gender"]').each(function () {
+                if ($(this).val() === footballerViewModel.gender) {
+                    $(this).prop('checked', true);
+                }
+            });
+        }
+
+
+
+    </script>
+}
+
